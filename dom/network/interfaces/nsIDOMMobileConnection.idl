@@ -12,6 +12,7 @@ interface nsIDOMMozMobileNetworkInfo;
 interface nsIDOMMozMobileCellInfo;
 interface nsIDOMMozIccManager;
 interface nsIDOMMozMobileCFInfo;
+interface nsIDOMMozMobileSignalInfo;
 
 [scriptable, builtinclass, uuid(4175a903-61e6-4fa7-af0d-1e41632ee2dd)]
 interface nsIDOMMozMobileConnection : nsIDOMEventTarget
@@ -365,20 +366,14 @@ interface nsIDOMMozMobileConnectionInfo : nsISupports
   readonly attribute DOMString type;
 
   /**
-   * Signal strength in dBm, or null if no service is available.
-   */
-  readonly attribute jsval signalStrength;
-
-  /**
-   * Signal strength, represented linearly as a number between 0 (weakest
-   * signal) and 100 (full signal).
-   */
-  readonly attribute jsval relSignalStrength;
-
-  /**
    * Cell location.
    */
   readonly attribute nsIDOMMozMobileCellInfo cell;
+  
+  /**
+   * Signal Information.
+   */
+  readonly attribute nsIDOMMozMobileSignalInfo signal;
 
 };
 
@@ -533,4 +528,58 @@ interface nsIDOMMozMobileCFInfo : nsISupports
    * nsIDOMMozMobileConnectionInfo.ICC_SERVICE_CLASS_* values.
    */
   readonly attribute unsigned short serviceClass;
+};
+[scriptable, uuid(1fef8037-7216-4c7f-a95c-a034876e81e2)]
+interface nsIDOMMozMobileSignalInfo: nsISupports
+{
+  /**
+   * GSM Signal strength. The value range is -51 ~ -114 dbm,
+   * The value, -114, means that no service is available.
+   */
+  readonly attribute jsval gsmSignal;
+  /**
+   * GSM bit error ratio. The value range is 0-7, and 99.
+   * The value, 99, means that no service is available.   
+   */
+  readonly attribute jsval gsmBER;
+  /**
+   * CDMA Signal strength in dBm. The value range is -1 ~ -121.
+   * The value, -121, means that no service is available.
+   */
+  readonly attribute jsval cdmaDBM;
+  /**
+   * CDMA Ec/Io. The value range is -5 ~ -316.
+   * The value, -316, means that no service is available.
+   */
+  readonly attribute jsval cdmaECIO;
+  /**
+   * EVDO Signal strength in dBm. The value range is -1 ~ -121.
+   * The value, -121, means that no service is available.
+   */
+  readonly attribute jsval evdoDBM;
+  /**
+   * EVDO Ec/Io. The value range is -5 ~ -316. The value, -316, 
+   * means that no service is available.
+   */
+  readonly attribute jsval evdoECIO;
+  /**
+   * EVDO signal noise ratio. The value range is -1 ~ 8.
+   * The value, -1, means that no service is available.
+   */
+  readonly attribute jsval evdoSNR;
+  /**
+   * LTE signal strength. The value range is -43 ~ -141 dbm.
+   * The value, -141, means that no service is available.
+   */
+  readonly attribute jsval lteSignal;
+  /**
+   * LTE reference signal power in dBm. The value range is -44 ~ -141.
+   * The value, -141, means that no service is available.
+   */
+  readonly attribute jsval lteRSRP;
+  /**
+   * LTE signal noise ratio. The value range is -141 ~ 260.
+   * The value, -141, means that no service is available.
+   */
+  readonly attribute jsval lteSNR;
 };

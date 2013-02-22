@@ -51,6 +51,8 @@ const CELLBROADCASTMESSAGE_CID =
   Components.ID("{29474c96-3099-486f-bb4a-3c9a1da834e4}");
 const CELLBROADCASTETWSINFO_CID =
   Components.ID("{59f176ee-9dcd-4005-9d47-f6be0cd08e17}");
+const MOBILESIGNALINFO_CID =
+  Components.ID("{13de10c3-7006-43c7-a91f-0cf8084b5de2}");
 
 const RIL_IPC_MSG_NAMES = [
   "RIL:CardStateChanged",
@@ -161,8 +163,7 @@ MobileConnectionInfo.prototype = {
   lastKnownMcc: 0,
   cell: null,
   type: null,
-  signalStrength: null,
-  relSignalStrength: null
+  signal: null
 };
 
 function MobileNetworkInfo() {}
@@ -252,6 +253,30 @@ MobileCFInfo.prototype = {
   number: null,
   timeSeconds: 0,
   serviceClass: -1
+};
+
+function MobileSignalInfo() {}
+MobileSignalInfo.prototype = {
+  QueryInterface: XPCOMUtils.generateQI([Ci.nsIDOMMozMobileSignalInfo]),
+  classID:        MOBILESIGNALINFO_CID,
+  classInfo:      XPCOMUtils.generateCI({
+    classID:          MOBILESIGNALINFO_CID,
+    classDescription: "MobileSignalInfo",
+    flags:            Ci.nsIClassInfo.DOM_OBJECT,
+    interfaces:       [Ci.nsIDOMMozMobileSignalInfo]
+  }),
+
+  // nsIDOMMozMobileSignalInfo
+  gsmSignal: null,
+  gsmBER: null,
+  cdmaDBM: null,
+  cdmaECIO: null,
+  evdoDBM: null,
+  evdoECIO: null,
+  evdoSNR: null,
+  lteSignal: null,
+  lteRSRP: null,
+  lteSNR: null
 };
 
 function CellBroadcastMessage(pdu) {
@@ -349,7 +374,7 @@ RILContentHelper.prototype = {
 
   updateConnectionInfo: function updateConnectionInfo(srcInfo, destInfo) {
     for (let key in srcInfo) {
-      if ((key != "network") && (key != "cell")) {
+      if ((key != "network") && (key != "cell") && (key != "signal")) {
         destInfo[key] = srcInfo[key];
       }
     }
@@ -376,6 +401,19 @@ RILContentHelper.prototype = {
     let network = destInfo.network;
     if (!network) {
       network = destInfo.network = new MobileNetworkInfo();
+    }
+
+    let srcSignal = srcInfo.signal;
+    if (!srcSignal) {
+      destInfo.signal = null;
+    } else {
+      let signal = destInfo.signal;
+      if (!signal) {
+        signal = destInfo.signal = new MobileSignalInfo();
+      }
+      for (let key in srcSignal) {
+        destInfo.signal[key] = srcSignal[key];
+      }
     }
 
     this.updateInfo(srcNetwork, network);

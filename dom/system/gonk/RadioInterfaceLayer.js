@@ -235,8 +235,16 @@ function RadioInterfaceLayer() {
                      lastKnownMcc: 0,
                      cell: null,
                      type: null,
-                     signalStrength: null,
-                     relSignalStrength: null},
+                     signal : { gsmSignal: null,
+                                gsmBER: null,
+                                cdmaDBM: null,
+                                cdmaECIO: null,
+                                evdoDBM: null,
+                                evdoECIO: null,
+                                evdoSNR: null,
+                                lteSignal: null,
+                                lteRSRP: null,
+                                lteSNR: null}},
     data:           {connected: false,
                      emergencyCallsOnly: false,
                      roaming: false,
@@ -244,8 +252,16 @@ function RadioInterfaceLayer() {
                      lastKnownMcc: 0,
                      cell: null,
                      type: null,
-                     signalStrength: null,
-                     relSignalStrength: null},
+                     signal : { gsmSignal: null,
+                                gsmBER: null,
+                                cdmaDBM: null,
+                                cdmaECIO: null,
+                                evdoDBM: null,
+                                evdoECIO: null,
+                                evdoSNR: null,
+                                lteSignal: null,
+                                lteRSRP: null,
+                                lteSNR: null}}
   };
 
   try {
@@ -846,10 +862,7 @@ RadioInterfaceLayer.prototype = {
     voiceInfo.connected = newInfo.connected;
     voiceInfo.roaming = newInfo.roaming;
     voiceInfo.emergencyCallsOnly = newInfo.emergencyCallsOnly;
-    // Unlike the data registration info, the voice info typically contains
-    // no (useful) radio tech information, so we have to manually set
-    // this here. (TODO GSM only for now, see bug 726098.)
-    voiceInfo.type = "gsm";
+    voiceInfo.type = newInfo.type;
 
     // Make sure we also reset the operator and signal strength information
     // if we drop off the network.
@@ -976,21 +989,120 @@ RadioInterfaceLayer.prototype = {
     this._cellBroadcastSearchListStr = message.searchListStr;
   },
 
+  /*
+   * The values of dbm, EcIo, RSRP, and RSRQ, should be negative.
+   * And we set the value to be -(endValue+1) for no service.
+   */
+  validateRFValue: function validateRFValue(rfValue, startValue, endValue) {
+    if (rfValue > startValue && rfValue <= endValue) {
+      return -rfValue;
+    }
+    else if (rfValue < -startValue && rfValue >= -endValue) {
+      return rfValue;
+    }
+    return -(endValue+1);
+  },
+
   handleSignalStrengthChange: function handleSignalStrengthChange(message) {
     let voiceInfo = this.rilContext.voice;
-    // TODO CDMA, EVDO, LTE, etc. (see bug 726098)
-    if (voiceInfo.signalStrength != message.gsmDBM ||
-        voiceInfo.relSignalStrength != message.gsmRelative) {
-      voiceInfo.signalStrength = message.gsmDBM;
-      voiceInfo.relSignalStrength = message.gsmRelative;
-      this._sendTargetMessage("mobileconnection", "RIL:VoiceInfoChanged", voiceInfo);
+    let dataInfo = this.rilContext.data;
+    let voiceSignal = voiceInfo.signal;
+    let dataSignal = dataInfo.signal;
+    let updateRFValues = false;
+    let rfValue;
+    /* Valid values are -51 ~ -113 as defined in TS 27.007.
+     * We use -255 to represent no-service.
+     */
+    rfValue = (message.gsmDBM >= -113 && message.gsmDBM <= -51)
+              ? message.gsmDBM
+              : -255;
+    if (voiceInfo.gsmSignal != rfValue) {
+      voiceSignal.gsmSignal = dataSignal.gsmSignal = rfValue;
+      updateRFValues = true;
+    }
+    // Valid values are (0-7, 99) as defined in TS 27.007.
+    rfValue = (message.gsmBitErrorRate >= 0 && message.gsmBitErrorRate <= 7)
+              ? message.gsmBitErrorRate
+              : 99;
+    if (voiceSignal.gsmBER != rfValue) {
+      voiceSignal.gsmBER = dataSignal.gsmBER = rfValue;
+      updateRFValues = true;
+    }
+    /* In 3GPP2 C.S0005, receive power = 10 * log(SD) + 120.
+     * But it is negative, its range should be -1 ~ -120
+     */
+    rfValue = this.validateRFValue(message.cdmaDBM, 0, 120);
+    if (voiceSignal.cdmaDBM != rfValue) {
+      voiceSignal.cdmaDBM = dataSignal.cdmaDBM = rfValue;
+      updateRFValues = true;
+    }
+    /* In 3GPP2 C.S0005, this value = - 0.5 * X, where X's value is 1 ~ 63
+     * which means its range is from -0.5 ~ -31.5db. And vendor usually change
+     * this value to be db*10, so the ecio value is -5 ~ - 315 in
+     * vendor's definition.
+     */
+    rfValue = this.validateRFValue(message.cdmaECIO, 0, 315);
+    if (voiceSignal.cdmaECIO != rfValue) {
+      voiceSignal.cdmaECIO = dataSignal.cdmaECIO = rfValue;
+      updateRFValues = true;
+    }
+    /* In 3GPP2 C.S0005, receive power = 10 * log(SD) + 120.
+     * But it is negative, its range is -1 ~ -120
+     */
+    rfValue = this.validateRFValue(message.evdoDBM, 0, 120);
+    if (voiceSignal.evdoDBM != rfValue) {
+      voiceSignal.evdoDBM = dataSignal.evdoDBM = rfValue;
+      updateRFValues = true;
+    }
+    /* In 3GPP2 C.S0005, this value = - 0.5 * X, where X's value are 1 ~ 63
+     * which means its range is from -0.5 ~ -31.5db. And vendor usually change
+     * this value to be db*10, so the ecio value is -5 ~ - 315 in
+     * vendor's definition.
+     */
+    rfValue = this.validateRFValue(message.evdoECIO, 0, 315);
+    if (voiceSignal.evdoECIO != rfValue) {
+      voiceSignal.evdoECIO = dataSignal.evdoECIO = rfValue;
+      updateRFValues = true;
+    }
+    // SNR = RSSI - NOISE, the snr value is 1 ~ 8 in vendor's definition.
+    rfValue = (message.evdoSNR >= 1 && message.evdoSNR <= 8)
+              ? message.evdoSNR
+              : -255;
+    if (voiceSignal.evdoSNR != message.evdoSNR) {
+      voiceSignal.evdoSNR = dataSignal.evdoSNR = rfValue;
+      updateRFValues = true;
+    }
+    /* Valid values are -41 ~ -140 as defined in TS 27.007.
+     * We use -255 to represent no-service.
+     */
+    rfValue = (message.lteSignalStrength >= 0 && 
+               message.lteSignalStrength <= 97)
+              ? (-140 + message.lteSignalStrength)
+              : -255;
+    if (voiceSignal.lteSignal != rfValue) {
+      voiceSignal.lteSignal = dataSignal.lteSignal = rfValue;
+      updateRFValues = true;
+    }
+    // In TS 36.133, -44 dbm >= RSRP >= -140 dbm
+    rfValue = this.validateRFValue(message.lteRSRP, 43, 140);
+    if (voiceSignal.lteRSRP != rfValue) {
+      voiceSignal.lteRSRP= dataSignal.lteRSRP = rfValue;
+      updateRFValues = true;
+    }
+    /* LTE SNR operating range is from -14dB to 26dB and vendor usually set
+     * this value to be SNR(db)*10, so this value should be -140 ~ 260.
+     * We use -255 to represent no-service.
+     */
+    rfValue = (message.lteRSSNR >= -140 && message.lteRSSNR <= 260)
+              ? message.lteRSSNR
+              : -255;
+    if (voiceSignal.lteSNR != message.lteRSSNR) {
+      voiceSignal.lteSNR = dataSignal.lteSNR = rfValue;
+      updateRFValues = true;
     }
 
-    let dataInfo = this.rilContext.data;
-    if (dataInfo.signalStrength != message.gsmDBM ||
-        dataInfo.relSignalStrength != message.gsmRelative) {
-      dataInfo.signalStrength = message.gsmDBM;
-      dataInfo.relSignalStrength = message.gsmRelative;
+    if (updateRFValues) {
+      this._sendTargetMessage("mobileconnection", "RIL:VoiceInfoChanged", voiceInfo);
       this._sendTargetMessage("mobileconnection", "RIL:DataInfoChanged", dataInfo);
     }
   },

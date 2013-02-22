@@ -605,13 +605,27 @@ BluetoothHfpManager::HandleVoiceConnectionChanged()
   }
 
   uint8_t signal;
+  nsIDOMMozMobileSignalInfo* signals;
   JS::Value value;
-  voiceInfo->GetRelSignalStrength(&value);
+  voiceInfo->GetSignal(&signals);
+  signals->GetGsmSignal(&value);
   if (!value.isNumber()) {
     NS_WARNING("Failed to get relSignalStrength in BluetoothHfpManager");
     return NS_ERROR_FAILURE;
   }
-  signal = ceil(value.toNumber() / 20.0);
+  if (value.toNumber() >= -86) {
+    signal = 5;
+  } else if (value.toNumber() >= -88) {
+    signal = 4;
+  } else if (value.toNumber() >= -97) {
+    signal = 3;
+  } else if (value.toNumber() >= -102) {
+    signal = 2;
+  } else if (value.toNumber() >= -108) {
+    signal = 1;
+  } else {
+    signal = 0;
+  }
 
   if (signal != sCINDItems[CINDType::SIGNAL].value) {
     sCINDItems[CINDType::SIGNAL].value = signal;
